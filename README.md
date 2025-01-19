@@ -41,6 +41,8 @@ Specifically:
 
 ## Usage
 
+**Require neovim nightly**
+
 ```lua
 require('phoenix').setup()
 ```
