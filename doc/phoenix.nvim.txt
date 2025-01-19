@@ -21,6 +21,9 @@ HOW FAST IT IS ?                       *phoenix.nvim-phoenix-how-fast-it-is-?*
 It enables smooth word completion in nearly 10,000 lines of text and provides
 instant completion in projects with thousands of files.
 
+(auto completion from neovim config
+<https://github.com/glepnir/nvim/blob/main/lua/internal/completion.lua>)
+
 In the Phoenix framework, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
 Additionally, the weight of each word is calculated based on its usage
