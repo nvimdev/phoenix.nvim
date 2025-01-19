@@ -9,6 +9,8 @@ instant completion in projects with thousands of files.
 
 ![Image](https://github.com/user-attachments/assets/ec81041b-7f37-4613-ad91-419a76ee2eeb)
 
+([auto completion from neovim config](https://github.com/glepnir/nvim/blob/main/lua/internal/completion.lua))
+
 In the Phoenix framework, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
 Additionally, the weight of each word is calculated based on its usage frequency
