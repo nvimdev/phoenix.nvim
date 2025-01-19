@@ -30,6 +30,43 @@ status is kept synchronized.
 require('phoenix').setup()
 ```
 
-all config in `vim.g.phoenix` option table see source file ...
+default config and custom in `vim.g.phoenix` option table.
+
+```
+{
+  filetypes = { '*' },
+  -- Dictionary related settings
+  dict = {
+    -- Maximum number of words to store in the dictionary
+    -- Higher values consume more memory but provide better completions
+    max_words = 50000,
+
+    -- Minimum word length to be considered for completion
+    -- Shorter words may create noise in completions
+    min_word_length = 2,
+    -- Time factor weight for sorting completions (0-1)
+    -- Higher values favor recently used items more strongly
+    recency_weight = 0.3,
+
+    -- Base weight for frequency in sorting (0-1)
+    -- Complements recency_weight, should sum to 1
+    frequency_weight = 0.7,
+  },
+
+  -- Performance related settings
+  scan = {
+    cache_ttl = 5000,
+    -- Number of items to process in each batch
+    -- Higher values improve speed but may cause stuttering
+    batch_size = 1000,
+    -- Ignored the file or dictionary which matched the pattern
+    ignore_patterns = {},
+
+    -- Throttle delay for dictionary updates in milliseconds
+    -- Prevents excessive CPU usage during rapid file changes
+    throttle_ms = 100,
+  },
+}
+```
 
 ## License MIT
