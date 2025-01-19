@@ -56,6 +56,8 @@ Specifically:
 
 USAGE                                             *phoenix.nvim-phoenix-usage*
 
+**Require neovim nightly**
+
 >lua
     require('phoenix').setup()
 <
