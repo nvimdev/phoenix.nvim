@@ -9,7 +9,7 @@ instant completion in projects with thousands of files.
 
 ![Image](https://github.com/user-attachments/assets/ec81041b-7f37-4613-ad91-419a76ee2eeb)
 
-[My custom completion config](#Completion in picture)
+[My custom completion config](# Completion)
 
 In the Phoenix framework, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
@@ -75,7 +75,7 @@ vim.g.phoenix = {
 }
 ```
 
-## Completion in picture
+## Completion
 
 I have a simple wrapper around `vim.lsp.completion` for works on character which
 does not exist in server triggerCharacters since `vim.lsp.completion` used
