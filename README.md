@@ -82,7 +82,8 @@ vim.g.phoenix = {
 
 2. I have a simple wrapper around `vim.lsp.completion` for works on character which
    does not exist in server triggerCharacters since `vim.lsp.completion` used
-   `InsertcharPre` for autotrigger.
+   `InsertcharPre` for autotrigger. Notice this script does not works when
+   deleted a character if you want need use `TextChangedI`.
 
 ```lua
 vim.opt.cot = 'menu,menuone,noinsert,fuzzy,popup'
