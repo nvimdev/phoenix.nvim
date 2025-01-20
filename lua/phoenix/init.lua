@@ -494,14 +494,15 @@ local function collect_completions(prefix)
     :totable()
 end
 
-local function find_last_occurrence(str, pattern)
+local function find_last_occurrence(str, patterns)
   local reversed_str = string.reverse(str)
-  local start_pos, end_pos = string.find(reversed_str, pattern)
-  if start_pos then
-    return #str - end_pos + 1
-  else
-    return nil
+  for _, pattern in ipairs(patterns) do
+    local start_pos, end_pos = string.find(reversed_str, pattern)
+    if start_pos then
+      return #str - end_pos + 1
+    end
   end
+  return nil
 end
 
 function server.create()
@@ -548,11 +549,11 @@ function server.create()
       local char_at_cursor = line:sub(position.character, position.character)
       if char_at_cursor == '/' then
         local prefix = line:sub(1, position.character)
-        local has_literal = find_last_occurrence(prefix, '"')
+        local has_literal = find_last_occurrence(prefix, { '"', "'" })
         if has_literal then
           prefix = prefix:sub(has_literal + 1, position.character)
         end
-        local has_space = find_last_occurrence(prefix, '%s')
+        local has_space = find_last_occurrence(prefix, { '%s' })
         if has_space then
           prefix = prefix:sub(has_space + 1, position.character)
         end
