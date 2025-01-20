@@ -1,47 +1,40 @@
 local client_capabilities = {}
 local projects = {}
 
--- Default configuration for Phoenix
-local default = {
+---Default configuration values for Phoenix
+---@type PhoenixConfig
+local Config = {
+  -- Enable for all filetypes by default
   filetypes = { '*' },
-  -- Dictionary related settings
+
+  -- Dictionary settings control word storage and scoring
   dict = {
-    -- Maximum number of words to store in the dictionary
-    -- Higher values consume more memory but provide better completions
-    max_words = 50000,
-
-    -- Minimum word length to be considered for completion
-    -- Shorter words may create noise in completions
-    min_word_length = 2,
-    -- Time factor weight for sorting completions (0-1)
-    -- Higher values favor recently used items more strongly
-    recency_weight = 0.3,
-
-    -- Base weight for frequency in sorting (0-1)
-    -- Complements recency_weight, should sum to 1
-    frequency_weight = 0.7,
+    capacity = 50000, -- Store up to 50k words
+    min_word_length = 2, -- Ignore single-letter words
+    weights = {
+      recency = 0.3, -- 30% weight to recent usage
+      frequency = 0.7, -- 70% weight to frequency
+    },
   },
 
-  -- Performance related settings
-  scan = {
-    cache_ttl = 5000,
-    -- Number of items to process in each batch
-    -- Higher values improve speed but may cause stuttering
-    batch_size = 1000,
-    -- Ignored the file or dictionary which matched the pattern
-    ignore_patterns = {},
+  -- Cleanup settings control dictionary maintenance
+  cleanup = {
+    cleanup_batch_size = 1000, -- Process 1000 words per batch
+    frequency_threshold = 0.1, -- Keep words used >10% of max frequency
+    collection_batch_size = 100, -- Collect 100 words before yielding
+    rebuild_batch_size = 100, -- Rebuild 100 words before yielding
+    idle_timeout_ms = 1000, -- Wait 1s before cleanup
+    cleanup_ratio = 0.9, -- Cleanup at 90% capacity
+  },
 
-    -- Throttle delay for dictionary updates in milliseconds
-    -- Prevents excessive CPU usage during rapid file changes
-    throttle_ms = 100,
+  -- Scanner settings control filesystem interaction
+  scanner = {
+    scan_batch_size = 1000, -- Scan 1000 items per batch
+    cache_duration_ms = 5000, -- Cache results for 5s
+    throttle_delay_ms = 100, -- Wait 100ms between updates
+    ignore_patterns = {}, -- No ignore patterns by default
   },
 }
-
-local cfg = setmetatable({}, {
-  __index = function(_, scope)
-    return vim.tbl_get(vim.g.phoenix or default, scope)
-  end,
-})
 
 local Trie = {}
 function Trie.new()
@@ -99,8 +92,8 @@ end
 local dict = {
   trie = Trie.new(),
   word_count = 0,
-  max_words = cfg.dict.max_words,
-  min_word_length = cfg.dict.min_word_length,
+  max_words = Config.dict.capacity,
+  min_word_length = Config.dict.min_word_length,
 }
 
 -- LRU cache
@@ -247,7 +240,7 @@ end
 
 local function scan_dir_async(path, callback)
   local cached = scan_cache:get(path)
-  if cached and (vim.uv.now() - cached.timestamp) < cfg.scan.cache_ttl then
+  if cached and (vim.uv.now() - cached.timestamp) < Config.scanner.cache_duration_ms then
     callback(cached.results)
     return
   end
@@ -260,7 +253,7 @@ local function scan_dir_async(path, callback)
     end
 
     local results = {}
-    local batch_size = cfg.scan.batch_size
+    local batch_size = Config.scanner.scan_batch_size
     local current_batch = {}
 
     while true do
@@ -272,8 +265,8 @@ local function scan_dir_async(path, callback)
         break
       end
 
-      if #cfg.scan.ignore_patterns > 0 then
-        local ok = vim.iter(cfg.scan.ignore_patterns):any(function(pattern)
+      if #Config.scanner.ignore_patterns > 0 then
+        local ok = vim.iter(Config.scanner.ignore_patterns):any(function(pattern)
           return name:match(pattern)
         end)
         if ok then
@@ -322,77 +315,135 @@ end
 
 -- async cleanup low frequency from dict
 local function cleanup_dict()
-  if dict.word_count <= dict.max_words then
+  local cleanup_Config = Config.cleanup
+  local dict_Config = Config.dict
+
+  -- Only cleanup if dictionary is getting full
+  if dict.word_count <= dict_Config.capacity * cleanup_Config.cleanup_ratio then
     return
   end
 
-  local co = coroutine.create(function()
-    local words = {}
-    local function collect_words(node, current_word)
-      if node.is_end then
-        table.insert(words, {
-          word = current_word,
-          frequency = node.frequency,
-        })
-      end
-      -- yield when collect 100 words
-      if #words % 100 == 0 then
-        coroutine.yield()
-      end
-      for char, child in pairs(node.children) do
-        collect_words(child, current_word .. char)
-      end
-    end
+  -- Create cleanup timer
+  local timer = assert(vim.uv.new_timer())
+  timer:start(cleanup_Config.idle_timeout_ms, 0, function()
+    timer:stop()
+    timer:close()
 
-    collect_words(dict.trie, '')
-    coroutine.yield()
+    local co = coroutine.create(function()
+      local words = {}
+      local max_frequency = 0
 
-    table.sort(words, function(a, b)
-      return a.frequency > b.frequency
+      -- Collect words and find max frequency
+      local function collect_words(node, current_word)
+        if node.is_end then
+          max_frequency = math.max(max_frequency, node.frequency)
+          table.insert(words, {
+            word = current_word,
+            frequency = node.frequency,
+            last_used = node.last_used,
+          })
+        end
+
+        -- Yield after processing collection_batch_size words
+        if #words % cleanup_Config.collection_batch_size == 0 then
+          coroutine.yield()
+        end
+
+        for char, child in pairs(node.children) do
+          collect_words(child, current_word .. char)
+        end
+      end
+
+      -- Start collecting words
+      collect_words(dict.trie, '')
+      coroutine.yield()
+
+      -- Sort by combined score (frequency and recency)
+      table.sort(words, function(a, b)
+        -- Calculate scores using configured weights
+        local a_score = (a.frequency / max_frequency) * dict_Config.weights.frequency
+          + (a.last_used / vim.uv.now()) * dict_Config.weights.recency
+        local b_score = (b.frequency / max_frequency) * dict_Config.weights.frequency
+          + (b.last_used / vim.uv.now()) * dict_Config.weights.recency
+        return a_score > b_score
+      end)
+
+      -- Filter out low frequency words
+      local threshold = max_frequency * cleanup_Config.frequency_threshold
+      local filtered_words = {}
+      for _, word in ipairs(words) do
+        if word.frequency >= threshold then
+          table.insert(filtered_words, word)
+        end
+        if #filtered_words >= dict_Config.capacity then
+          break
+        end
+      end
+      coroutine.yield()
+
+      -- Rebuild trie with remaining words
+      local new_trie = Trie.new()
+      local new_count = 0
+
+      -- Process words in batches
+      for i = 1, #filtered_words, cleanup_Config.cleanup_batch_size do
+        local batch_end = math.min(i + cleanup_Config.cleanup_batch_size - 1, #filtered_words)
+
+        -- Process current batch
+        for j = i, batch_end do
+          local word_data = filtered_words[j]
+          Trie.insert(new_trie, word_data.word, word_data.last_used)
+          new_count = new_count + 1
+        end
+
+        -- Yield after each batch
+        if i % cleanup_Config.rebuild_batch_size == 0 then
+          coroutine.yield()
+        end
+      end
+
+      -- Update dictionary with cleaned data
+      dict.trie = new_trie
+      dict.word_count = new_count
+
+      vim.notify(
+        string.format('Dictionary cleaned: reduced from %d to %d words', #words, new_count),
+        vim.log.levels.INFO
+      )
     end)
-    coroutine.yield()
 
-    local new_trie = Trie.new()
-    local new_count = 0
-
-    -- rebuild Trie
-    for i = 1, dict.max_words do
-      if words[i] then
-        Trie.insert(new_trie, words[i].word)
-        new_count = new_count + 1
+    -- Handle coroutine execution
+    local function resume()
+      local ok, err = coroutine.resume(co)
+      if not ok then
+        vim.notify(string.format('Error in cleanup_dict: %s', err), vim.log.levels.ERROR)
+        return
       end
-      if i % 100 == 0 then
-        coroutine.yield()
+
+      if coroutine.status(co) ~= 'dead' then
+        vim.schedule(resume)
       end
     end
 
-    dict.trie = new_trie
-    dict.word_count = new_count
+    vim.schedule(resume)
   end)
-
-  local function resume()
-    local ok = coroutine.resume(co)
-    if ok and coroutine.status(co) ~= 'dead' then
-      vim.schedule(resume)
-    end
-  end
-
-  vim.schedule(resume)
 end
 
+-- Update dictionary function that triggers cleanup
 local update_dict = async.throttle(function(lines)
+  local dict_Config = Config.dict
+  local scanner_Config = Config.scanner
   local processed = 0
-  local batch_size = 1000
 
   local function process_batch()
-    local end_idx = math.min(processed + batch_size, #lines)
+    local end_idx = math.min(processed + scanner_Config.scan_batch_size, #lines)
     local new_words = 0
 
     for i = processed + 1, end_idx do
       local line = lines[i]
       for word in line:gmatch('[^%s%.%_]+') do
-        if not tonumber(word) and #word >= dict.min_word_length then
-          if Trie.insert(dict.trie, word) then -- increase when is new word
+        if not tonumber(word) and #word >= dict_Config.min_word_length then
+          if Trie.insert(dict.trie, word, vim.uv.now()) then
             new_words = new_words + 1
           end
         end
@@ -404,15 +455,13 @@ local update_dict = async.throttle(function(lines)
 
     if processed < #lines then
       vim.schedule(process_batch)
-    elseif dict.word_count > dict.max_words then
-      vim.schedule(function()
-        cleanup_dict()
-      end)
+    elseif dict.word_count > dict_Config.capacity then
+      cleanup_dict()
     end
   end
 
   vim.schedule(process_batch)
-end, cfg.scan.throttle_ms)
+end, Config.scanner.throttle_delay_ms)
 
 local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
@@ -423,7 +472,7 @@ local function collect_completions(prefix)
   local now = vim.uv.now()
   return vim.tbl_map(function(node)
     local time_factor = math.max(0, 1 - (now - node.last_used) / (24 * 60 * 60 * 1000))
-    local weight = cfg.dict.frequency_weight + cfg.dict.recency_weight * time_factor
+    local weight = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor
     return {
       label = node.word,
       filterText = node.word,
@@ -502,7 +551,8 @@ function server.create()
           return
         end
 
-        local expanded_path = vim.fs.normalize(vim.fs.abspath(dir_part))
+        local expanded_path = vim.fn.has('nvim-0.10') and vim.fn.expand(dir_part)
+          or vim.fs.normalize(vim.fs.abspath(dir_part))
 
         scan_dir_async(expanded_path, function(results)
           local items = {}
@@ -597,9 +647,10 @@ function server.create()
   end
 end
 
-local function setup()
+local function setup(config)
+  Config = vim.tbl_deep_extend('force', Config, config or {})
   vim.api.nvim_create_autocmd('FileType', {
-    pattern = cfg.filetypes,
+    pattern = Config.filetypes,
     callback = function()
       vim.lsp.start({
         name = 'phoenix',

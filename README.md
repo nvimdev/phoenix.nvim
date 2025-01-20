@@ -24,47 +24,51 @@ status is kept synchronized.
 
 ## Usage
 
-**Require neovim nightly**
+Install with any plugin manager or builtin `:help packages`.
 
 ```lua
 require('phoenix').setup()
 ```
 
+Phoenix can work with any completion plugin which support lsp source or neovim
+nightly `vim.lsp.completion` module.
+
+## Config
+
 default config and custom in `vim.g.phoenix` option table.
 
 ```
+---Default configuration values for Phoenix
 {
+  -- Enable for all filetypes by default
   filetypes = { '*' },
-  -- Dictionary related settings
+
+  -- Dictionary settings control word storage and scoring
   dict = {
-    -- Maximum number of words to store in the dictionary
-    -- Higher values consume more memory but provide better completions
-    max_words = 50000,
-
-    -- Minimum word length to be considered for completion
-    -- Shorter words may create noise in completions
-    min_word_length = 2,
-    -- Time factor weight for sorting completions (0-1)
-    -- Higher values favor recently used items more strongly
-    recency_weight = 0.3,
-
-    -- Base weight for frequency in sorting (0-1)
-    -- Complements recency_weight, should sum to 1
-    frequency_weight = 0.7,
+    capacity = 50000, -- Store up to 50k words
+    min_word_length = 2, -- Ignore single-letter words
+    weights = {
+      recency = 0.3, -- 30% weight to recent usage
+      frequency = 0.7, -- 70% weight to frequency
+    },
   },
 
-  -- Performance related settings
-  scan = {
-    cache_ttl = 5000,
-    -- Number of items to process in each batch
-    -- Higher values improve speed but may cause stuttering
-    batch_size = 1000,
-    -- Ignored the file or dictionary which matched the pattern
-    ignore_patterns = {},
+  -- Cleanup settings control dictionary maintenance
+  cleanup = {
+    cleanup_batch_size = 1000, -- Process 1000 words per batch
+    frequency_threshold = 0.1, -- Keep words used >10% of max frequency
+    collection_batch_size = 100, -- Collect 100 words before yielding
+    rebuild_batch_size = 100, -- Rebuild 100 words before yielding
+    idle_timeout_ms = 1000, -- Wait 1s before cleanup
+    cleanup_ratio = 0.9, -- Cleanup at 90% capacity
+  },
 
-    -- Throttle delay for dictionary updates in milliseconds
-    -- Prevents excessive CPU usage during rapid file changes
-    throttle_ms = 100,
+  -- Scanner settings control filesystem interaction
+  scanner = {
+    scan_batch_size = 1000, -- Scan 1000 items per batch
+    cache_duration_ms = 5000, -- Cache results for 5s
+    throttle_delay_ms = 100, -- Wait 100ms between updates
+    ignore_patterns = {}, -- No ignore patterns by default
   },
 }
 ```
