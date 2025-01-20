@@ -9,7 +9,7 @@ instant completion in projects with thousands of files.
 
 ![Image](https://github.com/user-attachments/assets/ec81041b-7f37-4613-ad91-419a76ee2eeb)
 
-[My custom completion config](# Completion)
+[My custom completion config](#completion)
 
 In the Phoenix framework, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
@@ -30,7 +30,8 @@ nightly `vim.lsp.completion` module.
 
 ## Config
 
-default config and custom in `vim.g.phoenix` option table.
+Used `vim.g.phoenix` option table and modified the field what you need before
+plugin loaded.
 
 ```lua
 ---Default configuration values for Phoenix
@@ -77,9 +78,11 @@ vim.g.phoenix = {
 
 ## Completion
 
-I have a simple wrapper around `vim.lsp.completion` for works on character which
-does not exist in server triggerCharacters since `vim.lsp.completion` used
-`InsertcharPre` for autotrigger.
+1. Phoenix should works with any completion plugin which support lsp source.
+
+2. I have a simple wrapper around `vim.lsp.completion` for works on character which
+   does not exist in server triggerCharacters since `vim.lsp.completion` used
+   `InsertcharPre` for autotrigger.
 
 ```lua
 vim.opt.cot = 'menu,menuone,noinsert,fuzzy,popup'
