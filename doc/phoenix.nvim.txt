@@ -40,14 +40,9 @@ the directory status is kept synchronized.
 
 USAGE                                             *phoenix.nvim-phoenix-usage*
 
-Install with any plugin manager or builtin `:help packages`.
-
->lua
-    require('phoenix').setup()
-<
-
-Phoenix can work with any completion plugin which support lsp source or neovim
-nightly `vim.lsp.completion` module.
+Install with any plugin manager or builtin `:help packages`. Phoenix can work
+with any completion plugin which support lsp source or neovim nightly
+`vim.lsp.completion` module.
 
 
 CONFIG                                           *phoenix.nvim-phoenix-config*
