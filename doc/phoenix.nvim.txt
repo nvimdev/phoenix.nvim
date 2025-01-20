@@ -7,7 +7,7 @@ Table of Contents                             *phoenix.nvim-table-of-contents*
   - How fast it is ?                   |phoenix.nvim-phoenix-how-fast-it-is-?|
   - Usage                                         |phoenix.nvim-phoenix-usage|
   - Config                                       |phoenix.nvim-phoenix-config|
-  - Completion in picture         |phoenix.nvim-phoenix-completion-in-picture|
+  - Completion                               |phoenix.nvim-phoenix-completion|
   - License MIT                             |phoenix.nvim-phoenix-license-mit|
 2. Links                                                  |phoenix.nvim-links|
 
@@ -93,7 +93,7 @@ default config and custom in `vim.g.phoenix` option table.
 <
 
 
-COMPLETION IN PICTURE             *phoenix.nvim-phoenix-completion-in-picture*
+COMPLETION                                   *phoenix.nvim-phoenix-completion*
 
 I have a simple wrapper around `vim.lsp.completion` for works on character
 which does not exist in server triggerCharacters since `vim.lsp.completion`
