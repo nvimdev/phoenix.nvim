@@ -7,10 +7,16 @@ vim.g.phoenix = {
   -- Enable for all filetypes by default
   filetypes = { '*' },
 
-  -- Dictionary settings control word storage and scoring
+  -- Dictionary settings control word storage
   dict = {
     capacity = 50000, -- Store up to 50k words
     min_word_length = 2, -- Ignore single-letter words
+    word_pattern = '[^%s%.%_]+', -- Word pattern
+  },
+
+  -- Completion control the scoring
+  completion = {
+    decay_minutes = 30, -- Time period for decay calculation
     weights = {
       recency = 0.3, -- 30% weight to recent usage
       frequency = 0.7, -- 70% weight to frequency
@@ -78,7 +84,7 @@ function Trie.search_prefix(root, prefix)
       table.insert(results, {
         word = current_word,
         frequency = current_node.frequency,
-        last_used = vim.uv.now(),
+        last_used = current_node.last_used,
       })
     end
 
@@ -318,10 +324,10 @@ end
 -- async cleanup low frequency from dict
 local function cleanup_dict()
   local cleanup_Config = Config.cleanup
-  local dict_Config = Config.dict
+  local cmp_Config = Config.completion
 
   -- Only cleanup if dictionary is getting full
-  if dict.word_count <= dict_Config.capacity * cleanup_Config.cleanup_ratio then
+  if dict.word_count <= Config.dict.capacity * cleanup_Config.cleanup_ratio then
     return
   end
 
@@ -363,10 +369,10 @@ local function cleanup_dict()
       -- Sort by combined score (frequency and recency)
       table.sort(words, function(a, b)
         -- Calculate scores using configured weights
-        local a_score = (a.frequency / max_frequency) * dict_Config.weights.frequency
-          + (a.last_used / vim.uv.now()) * dict_Config.weights.recency
-        local b_score = (b.frequency / max_frequency) * dict_Config.weights.frequency
-          + (b.last_used / vim.uv.now()) * dict_Config.weights.recency
+        local a_score = (a.frequency / max_frequency) * cmp_Config.weights.frequency
+          + (a.last_used / vim.uv.now()) * cmp_Config.weights.recency
+        local b_score = (b.frequency / max_frequency) * cmp_Config.weights.frequency
+          + (b.last_used / vim.uv.now()) * cmp_Config.weights.recency
         return a_score > b_score
       end)
 
@@ -377,7 +383,7 @@ local function cleanup_dict()
         if word.frequency >= threshold then
           table.insert(filtered_words, word)
         end
-        if #filtered_words >= dict_Config.capacity then
+        if #filtered_words >= Config.dict.capacity then
           break
         end
       end
@@ -443,7 +449,7 @@ local update_dict = async.throttle(function(lines)
 
     for i = processed + 1, end_idx do
       local line = lines[i]
-      for word in line:gmatch('[^%s%.%_]+') do
+      for word in line:gmatch(Config.dict.word_pattern) do
         if not tonumber(word) and #word >= dict_Config.min_word_length then
           if Trie.insert(dict.trie, word, vim.uv.now()) then
             new_words = new_words + 1
@@ -468,17 +474,20 @@ end, Config.scanner.throttle_delay_ms)
 local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
   local now = vim.uv.now()
-  -- Calculate priority and sort in one step
+  local decay_time = Config.completion.decay_minutes * 60 * 1000
+
+  local max_freq = 0
+  for _, result in ipairs(results) do
+    max_freq = math.max(max_freq, result.frequency)
+    result.time_factor = math.max(0, 1 - (now - result.last_used) / decay_time)
+  end
+
   table.sort(results, function(a, b)
-    local time_factor_a = math.max(0, 1 - (now - a.last_used) / (24 * 60 * 60 * 1000))
-    local weight_a = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor_a
-    local priority_a = math.floor(a.frequency * weight_a * 1000)
-
-    local time_factor_b = math.max(0, 1 - (now - b.last_used) / (24 * 60 * 60 * 1000))
-    local weight_b = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor_b
-    local priority_b = math.floor(b.frequency * weight_b * 1000)
-
-    return priority_a > priority_b -- Sort by priority directly
+    local score_a = (a.frequency / max_freq * Config.completion.weights.frequency)
+      + (a.time_factor * Config.completion.weights.recency)
+    local score_b = (b.frequency / max_freq * Config.completion.weights.frequency)
+      + (b.time_factor * Config.completion.weights.recency)
+    return score_a > score_b
   end)
 
   return vim

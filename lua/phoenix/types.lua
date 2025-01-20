@@ -7,6 +7,11 @@
 ---@class DictionaryConfig
 ---@field capacity number Maximum number of words to store in the dictionary. Higher values provide better completions but use more memory
 ---@field min_word_length number Minimum length for a word to be considered for the dictionary. Lower values catch more words but may include noise
+---@field word_pattern string Pattern for word split
+
+---Configuration for completion
+---@class CompletionConfig
+---@field decay_minutes integer Time period for decay calculation
 ---@field weights WeightConfig Scoring weights configuration for ranking completion candidates
 
 ---Configuration for dictionary cleanup process
@@ -28,6 +33,7 @@
 ---Main configuration for Phoenix
 ---@class PhoenixConfig
 ---@field filetypes string[] List of filetypes to enable Phoenix for. Use {'*'} for all filetypes
----@field dict    DictionaryConfig Settings controlling the core dictionary behavior
+---@field dict DictionaryConfig Settings controlling the core dictionary behavior
+---@field completion CompletionConfig Settings controlling the core dictionary behavior
 ---@field cleanup CleanupConfig Settings controlling how and when dictionary cleanup occurs
 ---@field scanner ScannerConfig Settings controlling file system scanning behavior
