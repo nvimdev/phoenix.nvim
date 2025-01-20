@@ -25,11 +25,6 @@ status is kept synchronized.
 ## Usage
 
 Install with any plugin manager or builtin `:help packages`.
-
-```lua
-require('phoenix').setup()
-```
-
 Phoenix can work with any completion plugin which support lsp source or neovim
 nightly `vim.lsp.completion` module.
 

@@ -3,7 +3,7 @@ local projects = {}
 
 ---Default configuration values for Phoenix
 ---@type PhoenixConfig
-local Config = {
+vim.g.phoenix = {
   -- Enable for all filetypes by default
   filetypes = { '*' },
 
@@ -35,6 +35,8 @@ local Config = {
     ignore_patterns = {}, -- No ignore patterns by default
   },
 }
+
+local Config = vim.g.phoenix
 
 local Trie = {}
 function Trie.new()
@@ -465,21 +467,33 @@ end, Config.scanner.throttle_delay_ms)
 
 local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
+  local now = vim.uv.now()
+  -- Calculate priority and sort in one step
   table.sort(results, function(a, b)
-    return a.frequency > b.frequency
+    local time_factor_a = math.max(0, 1 - (now - a.last_used) / (24 * 60 * 60 * 1000))
+    local weight_a = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor_a
+    local priority_a = math.floor(a.frequency * weight_a * 1000)
+
+    local time_factor_b = math.max(0, 1 - (now - b.last_used) / (24 * 60 * 60 * 1000))
+    local weight_b = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor_b
+    local priority_b = math.floor(b.frequency * weight_b * 1000)
+
+    return priority_a > priority_b -- Sort by priority directly
   end)
 
-  local now = vim.uv.now()
-  return vim.tbl_map(function(node)
-    local time_factor = math.max(0, 1 - (now - node.last_used) / (24 * 60 * 60 * 1000))
-    local weight = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor
-    return {
-      label = node.word,
-      filterText = node.word,
-      kind = 1,
-      sortText = string.format('%09d', node.frequency * weight),
-    }
-  end, results)
+  return vim
+    .iter(ipairs(results))
+    :map(function(idx, node)
+      local time_factor = math.max(0, 1 - (now - node.last_used) / (24 * 60 * 60 * 1000))
+      local weight = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor
+      return {
+        label = node.word,
+        filterText = node.word,
+        kind = 1,
+        sortText = string.format('%09d%s', idx, node.word),
+      }
+    end)
+    :totable()
 end
 
 local function find_last_occurrence(str, pattern)
@@ -647,18 +661,17 @@ function server.create()
   end
 end
 
-local function setup(config)
-  Config = vim.tbl_deep_extend('force', Config, config or {})
-  vim.api.nvim_create_autocmd('FileType', {
-    pattern = Config.filetypes,
-    callback = function()
-      vim.lsp.start({
-        name = 'phoenix',
-        cmd = server.create(),
-        root_dir = vim.uv.cwd(),
-      })
-    end,
-  })
-end
-
-return { setup = setup }
+return {
+  register = function()
+    vim.api.nvim_create_autocmd('FileType', {
+      pattern = Config.filetypes,
+      callback = function()
+        vim.lsp.start({
+          name = 'phoenix',
+          cmd = server.create(),
+          root_dir = vim.uv.cwd(),
+        })
+      end,
+    })
+  end,
+}
