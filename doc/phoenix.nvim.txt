@@ -7,6 +7,7 @@ Table of Contents                             *phoenix.nvim-table-of-contents*
   - How fast it is ?                   |phoenix.nvim-phoenix-how-fast-it-is-?|
   - Usage                                         |phoenix.nvim-phoenix-usage|
   - Config                                       |phoenix.nvim-phoenix-config|
+  - Completion in picture         |phoenix.nvim-phoenix-completion-in-picture|
   - License MIT                             |phoenix.nvim-phoenix-license-mit|
 2. Links                                                  |phoenix.nvim-links|
 
@@ -22,8 +23,7 @@ HOW FAST IT IS ?                       *phoenix.nvim-phoenix-how-fast-it-is-?*
 It enables smooth word completion in nearly 10,000 lines of text and provides
 instant completion in projects with thousands of files.
 
-(auto completion from my neovim config
-<https://github.com/glepnir/nvim/blob/main/lua/internal/completion.lua>)
+|phoenix.nvim-my-custom-completion-config|
 
 In the Phoenix framework, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
@@ -49,16 +49,23 @@ CONFIG                                           *phoenix.nvim-phoenix-config*
 
 default config and custom in `vim.g.phoenix` option table.
 
->
+>lua
     ---Default configuration values for Phoenix
-    {
+    ---@type PhoenixConfig
+    vim.g.phoenix = {
       -- Enable for all filetypes by default
       filetypes = { '*' },
     
-      -- Dictionary settings control word storage and scoring
+      -- Dictionary settings control word storage
       dict = {
         capacity = 50000, -- Store up to 50k words
         min_word_length = 2, -- Ignore single-letter words
+        word_pattern = '[^%s%.%_]+', -- Word pattern
+      },
+    
+      -- Completion control the scoring
+      completion = {
+        decay_minutes = 30, -- Time period for decay calculation
         weights = {
           recency = 0.3, -- 30% weight to recent usage
           frequency = 0.7, -- 70% weight to frequency
@@ -83,6 +90,65 @@ default config and custom in `vim.g.phoenix` option table.
         ignore_patterns = {}, -- No ignore patterns by default
       },
     }
+<
+
+
+COMPLETION IN PICTURE             *phoenix.nvim-phoenix-completion-in-picture*
+
+I have a simple wrapper around `vim.lsp.completion` for works on character
+which does not exist in server triggerCharacters since `vim.lsp.completion`
+used `InsertcharPre` for autotrigger.
+
+>lua
+    vim.opt.cot = 'menu,menuone,noinsert,fuzzy,popup'
+    vim.opt.cia = 'kind,abbr,menu'
+    
+    api.nvim_create_autocmd('LspAttach', {
+      group = g,
+      callback = function(args)
+        local bufnr = args.buf
+        local client = lsp.get_client_by_id(args.data.client_id)
+        if not client or not client:supports_method(ms.textDocument_completion) then
+          return
+        end
+    
+        completion.enable(true, client.id, bufnr, {
+          autotrigger = true,
+          convert = function(item)
+            local kind = lsp.protocol.CompletionItemKind[item.kind] or 'u'
+            return {
+              abbr = item.label:gsub('%b()', ''),
+              kind = kind:sub(1, 1):lower(),
+              kind_hlgroup = ('@lsp.type.%s'):format(kind:sub(1, 1):lower() .. kind:sub(2)),
+            }
+          end,
+        })
+        if #api.nvim_get_autocmds({ buffer = bufnr, event = 'InsertCharPre', group = g }) ~= 0 then
+          return
+        end
+        api.nvim_create_autocmd(InsertCharPre, {
+          buffer = bufnr,
+          group = g,
+          callback = function()
+            if tonumber(pumvisible()) == 1 then
+              return
+            end
+            local triggerchars = vim.tbl_get(
+              client,
+              'server_capabilities',
+              'completionProvider',
+              'triggerCharacters'
+            ) or {}
+            if vim.v.char:match('[%w_]') and not vim.list_contains(triggerchars, vim.v.char) then
+              vim.schedule(function()
+                completion.trigger()
+              end)
+            end
+          end,
+          desc = 'glepnir: completion on character which not exist in lsp client triggerCharacters',
+        })
+      end,
+    })
 <
 
 
