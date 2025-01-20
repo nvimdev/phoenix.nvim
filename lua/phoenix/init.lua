@@ -576,17 +576,18 @@ function server.create()
             if vim.startswith(name:lower(), current_input:lower()) then
               local kind = entry.type == 'directory' and 19 or 17
               local label = name
+              local ishidden = false
               if entry.type == 'directory' then
                 label = label:gsub('/$', '')
               elseif entry.type == 'file' and name:match('^%.') then
-                label = label:gsub('^.', '')
+                ishidden = true
               end
 
               table.insert(items, {
                 label = label,
                 kind = kind,
                 insertText = label,
-                filterText = label,
+                filterText = ishidden and label:gsub('^.', '') or label,
                 detail = entry.is_hidden and '(Hidden)' or nil,
                 sortText = string.format('%d%s', entry.is_hidden and 1 or 0, label:lower()),
               })
