@@ -484,8 +484,6 @@ local function collect_completions(prefix)
   return vim
     .iter(ipairs(results))
     :map(function(idx, node)
-      local time_factor = math.max(0, 1 - (now - node.last_used) / (24 * 60 * 60 * 1000))
-      local weight = Config.dict.weights.frequency + Config.dict.weights.recency * time_factor
       return {
         label = node.word,
         filterText = node.word,
