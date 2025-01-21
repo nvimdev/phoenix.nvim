@@ -101,10 +101,9 @@ api.nvim_create_autocmd('LspAttach', {
     completion.enable(true, client.id, bufnr, {
       autotrigger = true,
       convert = function(item)
-        local kind = lsp.protocol.CompletionItemKind[item.kind] or 'u'
         return {
           abbr = item.label:gsub('%b()', ''),
-          kind = kind:sub(1, 1):lower(),
+          kind = item.kind:gsub('^.', string.lower)
         }
       end,
     })
