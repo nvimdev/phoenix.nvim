@@ -3,6 +3,11 @@
 ---@field recency number Weight for recency in scoring (0-1). Higher values favor recently used words more strongly
 ---@field frequency number Weight for frequency in scoring (0-1). Higher values favor frequently used words more strongly
 
+---Configuration for completion item position
+---@class PriorityConfig
+---@field base integer Base priority score (0-999)
+---@field position string Position relative to other LSP results: 'before' or 'after'
+
 ---Core dictionary configuration
 ---@class DictionaryConfig
 ---@field capacity number Maximum number of words to store in the dictionary. Higher values provide better completions but use more memory
@@ -13,6 +18,7 @@
 ---@class CompletionConfig
 ---@field decay_minutes integer Time period for decay calculation
 ---@field weights WeightConfig Scoring weights configuration for ranking completion candidates
+---@field priority PriorityConfig
 
 ---Configuration for dictionary cleanup process
 ---@class CleanupConfig

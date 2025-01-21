@@ -21,6 +21,10 @@ vim.g.phoenix = {
       recency = 0.3, -- 30% weight to recent usage
       frequency = 0.7, -- 70% weight to frequency
     },
+    priority = {
+      base = 100, -- Base priority score (0-999)
+      position = 'after', -- Position relative to other LSP results: 'before' or 'after'
+    },
   },
 
   -- Cleanup settings control dictionary maintenance
@@ -490,6 +494,7 @@ local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
   local now = vim.uv.now()
   local decay_time = Config.completion.decay_minutes * 60 * 1000
+  local priority_config = Config.completion.priority
 
   local max_freq = 0
   for _, result in ipairs(results) do
@@ -505,6 +510,11 @@ local function collect_completions(prefix)
     return score_a > score_b
   end)
 
+  -- Calculate sort prefix based on priority configuration
+  local sort_prefix = priority_config.position == 'before'
+      and string.format('%03d', priority_config.base)
+    or string.format('%03d', priority_config.base + 100)
+
   return vim
     .iter(ipairs(results))
     :map(function(idx, node)
@@ -512,7 +522,7 @@ local function collect_completions(prefix)
         label = node.word,
         filterText = node.word,
         kind = 1,
-        sortText = string.format('%09d%s', idx, node.word),
+        sortText = string.format('%s%09d%s', sort_prefix, idx, node.word),
       }
     end)
     :totable()
