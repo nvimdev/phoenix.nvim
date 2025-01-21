@@ -71,6 +71,10 @@ plugin loaded.
           recency = 0.3, -- 30% weight to recent usage
           frequency = 0.7, -- 70% weight to frequency
         },
+        priority = {
+          base = 100, -- Base priority score (0-999)
+          position = 'after', -- Position relative to other LSP results: 'before' or 'after'
+        },
       },
     
       -- Cleanup settings control dictionary maintenance
