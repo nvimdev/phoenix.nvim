@@ -11,7 +11,7 @@ instant completion in projects with thousands of files.
 
 [My custom completion config](#completion)
 
-In the Phoenix framework, a Trie tree is used to store words, ensuring that the
+In the Phoenix, a Trie tree is used to store words, ensuring that the
 completion results can be obtained in O(L) time (L is the length of the word).
 Additionally, the weight of each word is calculated based on its usage frequency
 and last usage time, and low-frequency words are asynchronously cleaned up periodically
