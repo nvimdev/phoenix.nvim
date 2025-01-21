@@ -11,7 +11,7 @@ vim.g.phoenix = {
   dict = {
     capacity = 50000, -- Store up to 50k words
     min_word_length = 2, -- Ignore single-letter words
-    word_pattern = '[^%s%.%_]+', -- Word pattern
+    word_pattern = '[^%s%.%_:%p]+', -- Word pattern
   },
 
   -- Completion control the scoring
