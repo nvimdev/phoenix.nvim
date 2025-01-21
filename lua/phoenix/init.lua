@@ -56,11 +56,22 @@ end
 
 function Trie.insert(root, word, timestamp)
   local node = root
+  local path = {} -- record node in path
+
   for i = 1, #word do
     local char = word:sub(i, i)
     node.children[char] = node.children[char] or Trie.new()
     node = node.children[char]
+    table.insert(path, node)
   end
+
+  -- update is_end
+  for i = 1, #path - 1 do
+    if path[i].is_end then
+      path[i].is_end = false
+    end
+  end
+
   local was_new = not node.is_end
   node.is_end = true
   node.frequency = node.frequency + 1
