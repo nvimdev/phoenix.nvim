@@ -1,6 +1,6 @@
 # Phoenix
 
-A blazing-fast, asynchronous, minimalist in-process server providing word and path completion.
+A blazing-fast in-process server providing word (based on frequency score and) path completion.
 
 ## How fast it is ?
 
