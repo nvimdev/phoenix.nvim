@@ -241,9 +241,11 @@ function async.throttle(fn, delay)
       delay,
       0,
       vim.schedule_wrap(function()
-        timer:stop()
-        timer:close()
-        fn(unpack(args))
+        if timer and not timer:is_closing() then
+          timer:stop()
+          timer:close()
+          fn(unpack(args))
+        end
       end)
     )
   end
