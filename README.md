@@ -72,7 +72,7 @@ vim.g.phoenix = {
     scan_batch_size = 1000, -- Scan 1000 items per batch
     cache_duration_ms = 5000, -- Cache results for 5s
     throttle_delay_ms = 100, -- Wait 100ms between updates
-    ignore_patterns = {}, -- No ignore patterns by default
+    ignore_patterns = {}, -- Dictionary or file ignored when path completion
   },
 }
 ```
