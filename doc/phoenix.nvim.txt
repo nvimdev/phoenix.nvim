@@ -14,7 +14,7 @@ Table of Contents                             *phoenix.nvim-table-of-contents*
 ==============================================================================
 1. Phoenix                                              *phoenix.nvim-phoenix*
 
-A blazing-fast, asynchronous, minimalist in-process server providing word and
+A blazing-fast in-process server providing word (based on frequency score and)
 path completion.
 
 
