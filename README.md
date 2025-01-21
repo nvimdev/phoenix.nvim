@@ -105,7 +105,6 @@ api.nvim_create_autocmd('LspAttach', {
         return {
           abbr = item.label:gsub('%b()', ''),
           kind = kind:sub(1, 1):lower(),
-          kind_hlgroup = ('@lsp.type.%s'):format(kind:sub(1, 1):lower() .. kind:sub(2)),
         }
       end,
     })
