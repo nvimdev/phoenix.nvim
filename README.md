@@ -49,6 +49,7 @@ vim.g.phoenix = {
 
   -- Completion control the scoring
   completion = {
+    max_items = 100, -- Max result items
     decay_minutes = 30, -- Time period for decay calculation
     weights = {
       recency = 0.3, -- 30% weight to recent usage

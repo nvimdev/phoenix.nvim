@@ -16,6 +16,7 @@ vim.g.phoenix = {
 
   -- Completion control the scoring
   completion = {
+    max_items = 100, -- Max result items
     decay_minutes = 30, -- Time period for decay calculation
     weights = {
       recency = 0.3, -- 30% weight to recent usage
@@ -93,10 +94,12 @@ function Trie.search_prefix(root, prefix)
     end
     node = node.children[char]
   end
+  local count = 0
 
   local results = {}
   local function collect_words(current_node, current_word)
     if current_node.is_end then
+      count = count + 1
       table.insert(results, {
         word = current_word,
         frequency = current_node.frequency,
@@ -106,6 +109,9 @@ function Trie.search_prefix(root, prefix)
 
     for char, child in pairs(current_node.children) do
       collect_words(child, current_word .. char)
+      if count >= Config.completion.max_items then
+        break
+      end
     end
   end
 

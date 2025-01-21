@@ -16,6 +16,7 @@
 
 ---Configuration for completion
 ---@class CompletionConfig
+---@field max_items integer Max result items
 ---@field decay_minutes integer Time period for decay calculation
 ---@field weights WeightConfig Scoring weights configuration for ranking completion candidates
 ---@field priority PriorityConfig
