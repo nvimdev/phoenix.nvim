@@ -31,6 +31,7 @@ vim.g.phoenix = {
     rebuild_batch_size = 100, -- Rebuild 100 words before yielding
     idle_timeout_ms = 1000, -- Wait 1s before cleanup
     cleanup_ratio = 0.9, -- Cleanup at 90% capacity
+    enable_notify = false, -- Enable notify when cleanup dictionary
   },
 
   -- Scanner settings control filesystem interaction
@@ -425,10 +426,12 @@ local function cleanup_dict()
       dict.trie = new_trie
       dict.word_count = new_count
 
-      vim.notify(
-        string.format('Dictionary cleaned: reduced from %d to %d words', #words, new_count),
-        vim.log.levels.INFO
-      )
+      if cleanup_Config.enable_notify then
+        vim.notify(
+          string.format('Dictionary cleaned: reduced from %d to %d words', #words, new_count),
+          vim.log.levels.INFO
+        )
+      end
     end)
 
     -- Handle coroutine execution

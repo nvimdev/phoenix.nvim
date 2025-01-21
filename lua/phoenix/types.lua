@@ -22,6 +22,7 @@
 ---@field rebuild_batch_size number Number of words to rebuild before yielding control. Balance between rebuild speed and responsiveness
 ---@field idle_timeout_ms number Time to wait after changes before starting cleanup (milliseconds). Prevents cleanup during rapid edits
 ---@field cleanup_ratio number Dictionary size ratio that triggers cleanup (0-1). Higher values mean more frequent cleanups
+---@field enable_notify boolean Enable notify when cleanup dictionary
 
 ---Configuration for file system scanning
 ---@class ScannerConfig
