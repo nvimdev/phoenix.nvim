@@ -460,12 +460,13 @@ local update_dict = async.throttle(function(lines)
   local function process_batch()
     local end_idx = math.min(processed + scanner_Config.scan_batch_size, #lines)
     local new_words = 0
+    local now = vim.uv.now()
 
     for i = processed + 1, end_idx do
       local line = lines[i]
       for word in line:gmatch(Config.dict.word_pattern) do
         if not tonumber(word) and #word >= dict_Config.min_word_length then
-          if Trie.insert(dict.trie, word, vim.uv.now()) then
+          if Trie.insert(dict.trie, word, now) then
             new_words = new_words + 1
           end
         end
