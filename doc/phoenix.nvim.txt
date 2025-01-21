@@ -122,10 +122,9 @@ deleted a character if you want need use `TextChangedI`.
         completion.enable(true, client.id, bufnr, {
           autotrigger = true,
           convert = function(item)
-            local kind = lsp.protocol.CompletionItemKind[item.kind] or 'u'
             return {
               abbr = item.label:gsub('%b()', ''),
-              kind = kind:sub(1, 1):lower(),
+              kind = item.kind:gsub('^.', string.lower)
             }
           end,
         })
