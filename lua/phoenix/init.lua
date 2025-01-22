@@ -11,7 +11,7 @@ vim.g.phoenix = {
   dict = {
     capacity = 50000, -- Store up to 50k words
     min_word_length = 2, -- Ignore single-letter words
-    word_pattern = '[^%s%.%_:%p]+', -- Word pattern
+    word_pattern = '[^%s%.%_:%p%d]+', -- Word pattern
   },
 
   -- Completion control the scoring
@@ -471,7 +471,7 @@ local update_dict = async.throttle(function(lines)
     for i = processed + 1, end_idx do
       local line = lines[i]
       for word in line:gmatch(Config.dict.word_pattern) do
-        if not seen[word] and not tonumber(word) and #word >= dict_Config.min_word_length then
+        if not seen[word] and #word >= dict_Config.min_word_length then
           if Trie.insert(dict.trie, word, now) then
             new_words = new_words + 1
             seen[word] = true
