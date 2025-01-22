@@ -16,7 +16,7 @@ vim.g.phoenix = {
 
   -- Completion control the scoring
   completion = {
-    max_items = 100, -- Max result items
+    max_items = 1000, -- Max result items
     decay_minutes = 30, -- Time period for decay calculation
     weights = {
       recency = 0.3, -- 30% weight to recent usage
@@ -69,13 +69,6 @@ function Trie.insert(root, word, timestamp)
     node.children[char] = node.children[char] or Trie.new()
     node = node.children[char]
     table.insert(path, node)
-  end
-
-  -- update is_end
-  for i = 1, #path - 1 do
-    if path[i].is_end then
-      path[i].is_end = false
-    end
   end
 
   local was_new = not node.is_end
@@ -468,6 +461,7 @@ local update_dict = async.throttle(function(lines)
   local dict_Config = Config.dict
   local scanner_Config = Config.scanner
   local processed = 0
+  local seen = {}
 
   local function process_batch()
     local end_idx = math.min(processed + scanner_Config.scan_batch_size, #lines)
@@ -477,9 +471,10 @@ local update_dict = async.throttle(function(lines)
     for i = processed + 1, end_idx do
       local line = lines[i]
       for word in line:gmatch(Config.dict.word_pattern) do
-        if not tonumber(word) and #word >= dict_Config.min_word_length then
+        if not seen[word] and not tonumber(word) and #word >= dict_Config.min_word_length then
           if Trie.insert(dict.trie, word, now) then
             new_words = new_words + 1
+            seen[word] = true
           end
         end
       end
@@ -653,7 +648,7 @@ function server.create()
     srv['textDocument/completion'] = srv.completion
 
     srv['textDocument/didOpen'] = function(params)
-      local filename = params.textDocument.uri:gsub('file://', '')
+      local filename = vim.uri_to_fname(params.textDocument.uri)
       local data = get_root(filename)
       if not data then
         return
@@ -663,7 +658,10 @@ function server.create()
     end
 
     srv['textDocument/didChange'] = function(params)
-      local filename = params.textDocument.uri:gsub('file://', '')
+      if tonumber(vim.fn.pumvisible()) == 1 then
+        return
+      end
+      local filename = vim.uri_to_fname(params.textDocument.uri)
       local root = get_root(filename)
       if not root then
         return
