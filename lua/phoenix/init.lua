@@ -567,9 +567,8 @@ function server.create()
     end
 
     function srv.completion(params, callback)
-      local uri = params.textDocument.uri
       local position = params.position
-      local filename = uri:gsub('file://', '')
+      local filename = vim.uri_to_fname(params.textDocument.uri)
       local root = get_root(filename)
 
       if not root then
@@ -672,6 +671,15 @@ function server.create()
       if dict.word_count > dict.max_words then
         cleanup_dict()
       end
+    end
+
+    srv['textDocument/didClose'] = function(params)
+      local filename = vim.uri_to_fname(params.textDocument.uri)
+      local root = get_root(filename)
+      if not root then
+        return
+      end
+      root[filename] = nil
     end
 
     function srv.shutdown(params, callback)
