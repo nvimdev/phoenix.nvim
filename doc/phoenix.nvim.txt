@@ -1,4 +1,4 @@
-*phoenix.nvim.txt*         For NVIM v0.8.0        Last change: 2025 January 21
+*phoenix.nvim.txt*         For NVIM v0.8.0        Last change: 2025 January 22
 
 ==============================================================================
 Table of Contents                             *phoenix.nvim-table-of-contents*
