@@ -456,41 +456,104 @@ local function cleanup_dict()
   end)
 end
 
--- Update dictionary function that triggers cleanup
-local update_dict = async.throttle(function(lines)
-  local dict_Config = Config.dict
-  local scanner_Config = Config.scanner
-  local processed = 0
-  local seen = {}
+local function visible_range(content)
+  local top = vim.fn.line('w0')
+  local bot = vim.fn.line('w$')
+  return vim.iter(vim.split(content, '\n')):slice(top, bot):join('\n')
+end
 
-  local function process_batch()
-    local end_idx = math.min(processed + scanner_Config.scan_batch_size, #lines)
-    local new_words = 0
-    local now = vim.uv.now()
+-- Core word processing function
+local function process_words(line, seen, dict_config)
+  local new_words = 0
+  local now = vim.uv.now()
 
-    for i = processed + 1, end_idx do
-      local line = lines[i]
-      for word in line:gmatch(Config.dict.word_pattern) do
-        if not seen[word] and #word >= dict_Config.min_word_length then
-          if Trie.insert(dict.trie, word, now) then
-            new_words = new_words + 1
-            seen[word] = true
-          end
-        end
+  for word in line:gmatch(dict_config.word_pattern) do
+    if not seen[word] and #word >= dict_config.min_word_length then
+      if Trie.insert(dict.trie, word, now) then
+        new_words = new_words + 1
+        seen[word] = true
       end
     end
+  end
 
-    dict.word_count = dict.word_count + new_words
-    processed = end_idx
+  return new_words
+end
+
+-- Batch processing function
+local function process_lines_batch(lines, start_idx, batch_size, seen, dict_config)
+  local end_idx = math.min(start_idx + batch_size, #lines)
+  local new_words = 0
+
+  for i = start_idx + 1, end_idx do
+    new_words = new_words + process_words(lines[i], seen, dict_config)
+  end
+
+  dict.word_count = dict.word_count + new_words
+  return end_idx
+end
+
+-- Initialize dictionary with full content
+local initialize_dict = async.throttle(function(content)
+  local dict_config = Config.dict
+  local scanner_config = Config.scanner
+  local processed = 0
+  local seen = {}
+  local lines = vim.split(content, '\n')
+
+  local function process_batch()
+    processed =
+      process_lines_batch(lines, processed, scanner_config.scan_batch_size, seen, dict_config)
 
     if processed < #lines then
       vim.schedule(process_batch)
-    elseif dict.word_count > dict_Config.capacity then
+    elseif dict.word_count > dict_config.capacity then
       cleanup_dict()
     end
   end
 
   vim.schedule(process_batch)
+end, Config.scanner.throttle_delay_ms)
+
+-- Update dictionary with changes
+local update_dict = async.throttle(function(new, old)
+  if not old then
+    return
+  end
+
+  local hunks = vim.diff(old, new, {
+    result_type = 'indices',
+    algorithm = 'minimal',
+    ignore_cr_at_eol = true,
+    ignore_whitespace = true,
+    ignore_blank_lines = true,
+    ctxlen = 0,
+    ignore_whitespace_change = true,
+    ignore_whitespace_change_at_eol = true,
+  })
+
+  if not hunks or #hunks == 0 then
+    return
+  end
+  print(vim.inspect(hunks))
+
+  local seen = {}
+  local lines = vim.split(new, '\n')
+  local new_words = 0
+
+  -- Process changed lines
+  ---@diagnostic disable-next-line: param-type-mismatch
+  for _, hunk in ipairs(hunks) do
+    local start_new, count_new = hunk[3], hunk[4]
+    if count_new > 0 then
+      new_words = new_words + process_words(lines[start_new], seen, Config.dict)
+    end
+  end
+
+  dict.word_count = dict.word_count + new_words
+
+  if dict.word_count > dict.max_words then
+    cleanup_dict()
+  end
 end, Config.scanner.throttle_delay_ms)
 
 local function collect_completions(prefix)
@@ -542,6 +605,37 @@ local function find_last_occurrence(str, patterns)
   return nil
 end
 
+-- LSP handler functions
+local function handle_document_open(params)
+  local filename = vim.uri_to_fname(params.textDocument.uri)
+  local data = get_root(filename)
+  if not data then
+    return
+  end
+
+  data[filename] = params.textDocument.text
+  initialize_dict(data[filename])
+end
+
+local function handle_document_change(params)
+  if tonumber(vim.fn.pumvisible()) == 1 then
+    return
+  end
+
+  local filename = vim.uri_to_fname(params.textDocument.uri)
+  local root = get_root(filename)
+  if not root then
+    return
+  end
+
+  local new = params.contentChanges[1].text
+  local old = root[filename]
+  root[filename] = new
+
+  -- Only process visible range for better performance
+  update_dict(visible_range(new), visible_range(old))
+end
+
 function server.create()
   return function()
     local srv = {}
@@ -576,7 +670,8 @@ function server.create()
         return
       end
 
-      local line = root[filename][position.line + 1]
+      local lines = vim.split(root[filename], '\n')
+      local line = lines[position.line + 1]
       if not line then
         schedule_result(callback)
         return
@@ -646,32 +741,8 @@ function server.create()
 
     srv['textDocument/completion'] = srv.completion
 
-    srv['textDocument/didOpen'] = function(params)
-      local filename = vim.uri_to_fname(params.textDocument.uri)
-      local data = get_root(filename)
-      if not data then
-        return
-      end
-      data[filename] = vim.split(params.textDocument.text, '\n')
-      update_dict(data[filename])
-    end
-
-    srv['textDocument/didChange'] = function(params)
-      if tonumber(vim.fn.pumvisible()) == 1 then
-        return
-      end
-      local filename = vim.uri_to_fname(params.textDocument.uri)
-      local root = get_root(filename)
-      if not root then
-        return
-      end
-      root[filename] = vim.split(params.contentChanges[1].text, '\n')
-      update_dict(root[filename])
-
-      if dict.word_count > dict.max_words then
-        cleanup_dict()
-      end
-    end
+    srv['textDocument/didOpen'] = handle_document_open
+    srv['textDocument/didChange'] = handle_document_change
 
     srv['textDocument/didClose'] = function(params)
       local filename = vim.uri_to_fname(params.textDocument.uri)
