@@ -534,7 +534,6 @@ local update_dict = async.throttle(function(new, old)
   if not hunks or #hunks == 0 then
     return
   end
-  print(vim.inspect(hunks))
 
   local seen = {}
   local lines = vim.split(new, '\n')
