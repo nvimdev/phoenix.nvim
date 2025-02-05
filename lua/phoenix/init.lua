@@ -3,7 +3,7 @@ local projects = {}
 
 ---Default configuration values for Phoenix
 ---@type PhoenixConfig
-local defaults = {
+local default = {
   -- Enable for all filetypes by default
   filetypes = { '*' },
 
@@ -47,8 +47,16 @@ local defaults = {
     ignore_patterns = {}, -- No ignore patterns by default
   },
 }
-vim.g.phoenix = vim.tbl_deep_extend('force', defaults, vim.g.phoenix or {})
-local Config = vim.g.phoenix
+
+--@type PhoenixConfig
+local Config = setmetatable({}, {
+  __index = function(_, scope)
+    if vim.g.phoenix and vim.g.phoenix[scope] ~= nil then
+      return vim.g.phoenix[scope]
+    end
+    return default[scope]
+  end,
+})
 
 local Trie = {}
 function Trie.new()
