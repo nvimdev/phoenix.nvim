@@ -43,7 +43,7 @@ local default = {
   scanner = {
     scan_batch_size = 1000, -- Scan 1000 items per batch
     cache_duration_ms = 5000, -- Cache results for 5s
-    throttle_delay_ms = 150, -- Wait 150ms between updates
+    throttle_delay_ms = 200, -- Wait 200ms between updates
     ignore_patterns = {}, -- No ignore patterns by default
   },
 }
