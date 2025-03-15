@@ -46,6 +46,7 @@ local default = {
     throttle_delay_ms = 200, -- Wait 200ms between updates
     ignore_patterns = {}, -- No ignore patterns by default
   },
+  snippet = '',
 }
 
 --@type PhoenixConfig
@@ -226,31 +227,6 @@ function LRUCache:put(key, value)
 end
 
 local scan_cache = LRUCache:new(100)
-
-local async = {}
-
-function async.throttle(fn, delay)
-  local timer = nil
-  return function(...)
-    local args = { ... }
-    if timer and not timer:is_closing() then
-      timer:stop()
-      timer:close()
-    end
-    timer = assert(vim.uv.new_timer())
-    timer:start(
-      delay,
-      0,
-      vim.schedule_wrap(function()
-        if timer and not timer:is_closing() then
-          timer:stop()
-          timer:close()
-          fn(unpack(args))
-        end
-      end)
-    )
-  end
-end
 
 local server = {}
 
@@ -500,6 +476,8 @@ local function process_lines_batch(lines, start_idx, batch_size, seen, dict_conf
   return end_idx
 end
 
+local async = require('phoenix.async')
+
 -- Initialize dictionary with full content
 local initialize_dict = async.throttle(function(content)
   local dict_config = Config.dict
@@ -562,6 +540,88 @@ local update_dict = async.throttle(function(new, old)
     cleanup_dict()
   end
 end, Config.scanner.throttle_delay_ms)
+
+local Snippet = {
+  cache = {},
+  loading = {},
+}
+
+function Snippet:preload()
+  local ft = vim.bo.filetype
+  if self.cache[ft] or self.loading[ft] then
+    return
+  end
+  local path = vim.fs.joinpath(Config.snippet, ('%s.json'):format(ft))
+  if vim.fn.filereadable(path) == 1 then
+    self.loading[ft] = true
+    async.read_file(path, function(data)
+      local success, snippets = pcall(vim.json.decode, data)
+      if success then
+        self.cache[ft] = snippets
+        self.loading[ft] = nil
+      else
+        vim.notify(
+          string.format('Error parsing snippet file for %s: %s', ft, snippets),
+          vim.log.levels.ERROR
+        )
+        self.cache[ft] = {}
+        self.loading[ft] = nil
+      end
+    end)
+  end
+end
+
+local function parse_snippet(input)
+  local ok, parsed = pcall(function()
+    return vim.lsp._snippet_grammar.parse(input)
+  end)
+  return ok and tostring(parsed) or input
+end
+
+function Snippet:get_completions(prefix)
+  local ft = vim.bo.filetype
+  local results = {}
+
+  if not self.cache[ft] then
+    return results
+  end
+
+  local snippets = self.cache[ft]
+  for trigger, snippet_data in pairs(snippets) do
+    if vim.startswith(trigger:lower(), prefix:lower()) then
+      local body = snippet_data.body
+      local insert_text = body
+
+      if type(body) == 'table' then
+        insert_text = table.concat(body, '\n')
+      end
+
+      table.insert(results, {
+        label = trigger,
+        kind = 15,
+        insertText = insert_text,
+        documentation = {
+          kind = 'markdown',
+          value = snippet_data.description
+            .. '\n\n```'
+            .. ft
+            .. '\n'
+            .. parse_snippet(insert_text)
+            .. '\n```',
+        },
+        detail = 'Snippet: ' .. (snippet_data.description or ''),
+        sortText = string.format('001%s', trigger),
+        insertTextFormat = 2,
+      })
+    end
+  end
+
+  table.sort(results, function(a, b)
+    return a.label < b.label
+  end)
+
+  return results
+end
 
 local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
@@ -742,7 +802,8 @@ function server.create()
         end
 
         local items = collect_completions(prefix)
-        schedule_result(callback, items)
+        local snippets = Snippet:get_completions(prefix)
+        schedule_result(callback, vim.list_extend(items, snippets))
       end
     end
 
@@ -791,12 +852,19 @@ return {
   register = function()
     vim.api.nvim_create_autocmd('FileType', {
       pattern = Config.filetypes,
-      callback = function()
+      callback = function(args)
         vim.lsp.start({
           name = 'phoenix',
           cmd = server.create(),
           root_dir = vim.uv.cwd(),
+          reuse_client = function()
+            return true
+          end,
         })
+
+        if #Config.snippet > 0 then
+          Snippet:preload()
+        end
       end,
     })
   end,

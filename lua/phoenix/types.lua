@@ -45,3 +45,4 @@
 ---@field completion CompletionConfig Settings controlling the core dictionary behavior
 ---@field cleanup CleanupConfig Settings controlling how and when dictionary cleanup occurs
 ---@field scanner ScannerConfig Settings controlling file system scanning behavior
+---@field snippet string Snippet path

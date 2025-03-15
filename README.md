@@ -79,6 +79,7 @@ vim.g.phoenix = {
     throttle_delay_ms = 200, -- Wait 200ms between updates
     ignore_patterns = {}, -- Dictionary or file ignored when path completion
   },
+  snippet = '' -- path of snippet json file like c.json/zig.json/go.json
 }
 ```
 
