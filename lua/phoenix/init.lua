@@ -830,7 +830,7 @@ function server.create()
         if srv[method] then
           srv[method](params, callback)
         else
-          callback('Method not found: ' .. method)
+          callback({ messages = 'Method not found: ' .. method })
         end
       end,
       notify = function(method, params)
