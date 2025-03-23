@@ -138,6 +138,21 @@ api.nvim_create_autocmd('LspAttach', {
       end,
       desc = 'glepnir: completion on character which not exist in lsp client triggerCharacters',
     })
+    api.nvim_create_autocmd('TextChangedP', {
+      buffer = bufnr,
+      group = g,
+      callback = function()
+        vim.g._ts_force_sync_parsing = true
+      end,
+    })
+
+    api.nvim_create_autocmd('CompleteDone', {
+      buffer = bufnr,
+      group = g,
+      callback = function()
+        vim.g._ts_force_sync_parsing = false
+      end,
+    })
   end,
 })
 ```
