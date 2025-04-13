@@ -698,6 +698,9 @@ local function handle_document_change(params)
   end
 
   local new = params.contentChanges[1].text
+  if not new then
+    return
+  end
   local old = root[filename]
   root[filename] = new
 
