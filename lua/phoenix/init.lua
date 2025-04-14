@@ -602,8 +602,8 @@ function Snippet:get_completions(prefix)
         insertText = insert_text,
         documentation = {
           kind = 'markdown',
-          value = snippet_data.description
-            .. '\n\n```'
+          value = (snippet_data.description and snippet_data.description .. '\n\n' or '')
+            .. '```'
             .. ft
             .. '\n'
             .. parse_snippet(insert_text)
