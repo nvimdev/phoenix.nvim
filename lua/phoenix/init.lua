@@ -858,6 +858,10 @@ return {
     vim.api.nvim_create_autocmd('FileType', {
       pattern = Config.filetypes,
       callback = function(args)
+        if vim.bo[args.buf].buftype == 'nofile' then
+          return
+        end
+
         vim.lsp.start({
           name = 'phoenix',
           cmd = server.create(),
