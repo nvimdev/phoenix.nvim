@@ -230,17 +230,6 @@ local scan_cache = LRUCache:new(100)
 
 local server = {}
 
-local function get_root(filename)
-  local data
-  for r, item in pairs(projects) do
-    if vim.startswith(filename, r) then
-      data = item
-      break
-    end
-  end
-  return data
-end
-
 local function schedule_result(callback, items)
   vim.schedule(function()
     callback(nil, { isIncomplete = false, items = items or {} })
@@ -479,12 +468,11 @@ end
 local async = require('phoenix.async')
 
 -- Initialize dictionary with full content
-local initialize_dict = async.throttle(function(content)
+local initialize_dict = async.throttle(function(lines)
   local dict_config = Config.dict
   local scanner_config = Config.scanner
   local processed = 0
   local seen = {}
-  local lines = vim.split(content, '\n')
 
   local function process_batch()
     processed =
@@ -498,47 +486,6 @@ local initialize_dict = async.throttle(function(content)
   end
 
   vim.schedule(process_batch)
-end, Config.scanner.throttle_delay_ms)
-
--- Update dictionary with changes
-local update_dict = async.throttle(function(new, old)
-  if not old then
-    return
-  end
-
-  local hunks = vim.diff(old, new, {
-    result_type = 'indices',
-    algorithm = 'minimal',
-    ignore_cr_at_eol = true,
-    ignore_whitespace = true,
-    ignore_blank_lines = true,
-    ctxlen = 0,
-    ignore_whitespace_change = true,
-    ignore_whitespace_change_at_eol = true,
-  })
-
-  if not hunks or #hunks == 0 then
-    return
-  end
-
-  local seen = {}
-  local lines = vim.split(new, '\n')
-  local new_words = 0
-
-  -- Process changed lines
-  ---@diagnostic disable-next-line: param-type-mismatch
-  for _, hunk in ipairs(hunks) do
-    local start_new, count_new = hunk[3], hunk[4]
-    if count_new > 0 then
-      new_words = new_words + process_words(lines[start_new], seen, Config.dict)
-    end
-  end
-
-  dict.word_count = dict.word_count + new_words
-
-  if dict.word_count > dict.max_words then
-    cleanup_dict()
-  end
 end, Config.scanner.throttle_delay_ms)
 
 local Snippet = {
@@ -676,14 +623,16 @@ end
 
 -- LSP handler functions
 local function handle_document_open(params)
-  local filename = vim.uri_to_fname(params.textDocument.uri)
-  local data = get_root(filename)
-  if not data then
+  local text = params.textDocument.text
+  if #text == 0 then
+    return
+  end
+  local content = vim.split(text, '%s', { trimempty = true })
+  if #content == 0 then
     return
   end
 
-  data[filename] = params.textDocument.text
-  initialize_dict(data[filename])
+  initialize_dict(content)
 end
 
 local function handle_document_change(params)
@@ -691,21 +640,32 @@ local function handle_document_change(params)
     return
   end
 
-  local filename = vim.uri_to_fname(params.textDocument.uri)
-  local root = get_root(filename)
-  if not root then
+  -- Process only the changed text
+  local change = params.contentChanges[1]
+  if not change or not change.text then
     return
   end
 
-  local new = params.contentChanges[1].text
-  if not new then
+  -- Process just the changed text
+  local lines = vim.split(change.text, '\n')
+  if #lines == 0 then
     return
   end
-  local old = root[filename]
-  root[filename] = new
 
-  -- Only process visible range for better performance
-  update_dict(visible_range(new), visible_range(old))
+  -- Process the new text directly without comparing to old version
+  local seen = {}
+  local dict_config = Config.dict
+  local new_words = 0
+
+  for _, line in ipairs(lines) do
+    new_words = new_words + process_words(line, seen, dict_config)
+  end
+
+  dict.word_count = dict.word_count + new_words
+
+  if dict.word_count > dict.max_words then
+    cleanup_dict()
+  end
 end
 
 function server.create()
@@ -734,17 +694,9 @@ function server.create()
 
     function srv.completion(params, callback)
       local position = params.position
-      local filename = vim.uri_to_fname(params.textDocument.uri)
-      local root = get_root(filename)
-
-      if not root then
-        schedule_result(callback)
-        return
-      end
-
-      local lines = vim.split(root[filename], '\n')
-      local line = lines[position.line + 1]
-      if not line then
+      -- local lines = vim.split(root[filename], '\n')
+      local line = vim.api.nvim_get_current_line()
+      if #line == 0 then
         schedule_result(callback)
         return
       end
@@ -817,14 +769,7 @@ function server.create()
     srv['textDocument/didOpen'] = handle_document_open
     srv['textDocument/didChange'] = handle_document_change
 
-    srv['textDocument/didClose'] = function(params)
-      local filename = vim.uri_to_fname(params.textDocument.uri)
-      local root = get_root(filename)
-      if not root then
-        return
-      end
-      root[filename] = nil
-    end
+    srv['textDocument/didClose'] = function(params) end
 
     function srv.shutdown(params, callback)
       callback(nil, nil)
@@ -858,7 +803,7 @@ return {
     vim.api.nvim_create_autocmd('FileType', {
       pattern = Config.filetypes,
       callback = function(args)
-        if vim.bo[args.buf].buftype == 'nofile' then
+        if vim.bo[args.buf].filetype == '' then
           return
         end
 

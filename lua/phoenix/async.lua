@@ -52,7 +52,7 @@ local read_file = async(function(filepath, callback)
   callback(data)
 end)
 
-function throttle(fn, delay)
+local function throttle(fn, delay)
   local timer = nil
   return function(...)
     local args = { ... }
