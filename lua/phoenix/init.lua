@@ -803,7 +803,7 @@ return {
     vim.api.nvim_create_autocmd('FileType', {
       pattern = Config.filetypes,
       callback = function(args)
-        if vim.bo[args.buf].filetype == '' then
+        if vim.bo[args.buf].buftype == '' then
           return
         end
 
