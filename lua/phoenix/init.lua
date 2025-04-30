@@ -801,6 +801,7 @@ end
 return {
   register = function()
     vim.api.nvim_create_autocmd('FileType', {
+      group = vim.api.nvim_create_augroup('Phoenix', { clear = true }),
       pattern = Config.filetypes,
       callback = function(args)
         if vim.bo[args.buf].filetype == '' then
@@ -820,6 +821,7 @@ return {
           Snippet:preload()
         end
       end,
+      desc = 'Phoenix autostart',
     })
   end,
 }
