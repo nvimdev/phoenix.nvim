@@ -804,7 +804,7 @@ return {
       group = vim.api.nvim_create_augroup('Phoenix', { clear = true }),
       pattern = Config.filetypes,
       callback = function(args)
-        if vim.bo[args.buf].filetype == '' then
+        if vim.bo[args.buf].filetype == '' or vim.bo[args.buf].buftype == 'nofile' then
           return
         end
 
