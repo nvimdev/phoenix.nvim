@@ -804,7 +804,11 @@ return {
       group = vim.api.nvim_create_augroup('Phoenix', { clear = true }),
       pattern = Config.filetypes,
       callback = function(args)
-        if vim.list_contains({ 'terminal', 'nofile' }, vim.bo[args.buf].buftype) then
+        local buf = args.buf
+        if
+          not vim.bo[buf].modifiable
+          or vim.list_contains({ 'terminal', 'nofile' }, vim.bo[buf].buftype)
+        then
           return
         end
 
