@@ -799,6 +799,23 @@ function server.create()
 end
 
 return {
+  lsp = function()
+    return {
+      cmd = server.create(),
+      filetypes = Config.filetypes,
+      root_dir = function(bufnr, on_dir)
+        if
+          vim.bo[bufnr].modifiable
+          and not vim.list_contains({ 'terminal', 'nofile' }, vim.bo[bufnr].buftype)
+        then
+          on_dir(vim.uv.cwd())
+        end
+      end,
+      reuse_client = function()
+        return true
+      end,
+    }
+  end,
   register = function()
     vim.api.nvim_create_autocmd('FileType', {
       group = vim.api.nvim_create_augroup('Phoenix', { clear = true }),
