@@ -694,7 +694,6 @@ function server.create()
 
     function srv.completion(params, callback)
       local position = params.position
-      -- local lines = vim.split(root[filename], '\n')
       local line = vim.api.nvim_get_current_line()
       if #line == 0 then
         schedule_result(callback)
@@ -719,9 +718,7 @@ function server.create()
           return
         end
 
-        local expanded_path = vim.fn.has('nvim-0.10') and vim.fn.expand(dir_part)
-          or vim.fs.normalize(vim.fs.abspath(dir_part))
-
+        local expanded_path = vim.fs.normalize(vim.fs.abspath(dir_part))
         scan_dir_async(expanded_path, function(results)
           local items = {}
           local current_input = prefix:match('[^/]*$') or ''
