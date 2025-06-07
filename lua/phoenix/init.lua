@@ -595,13 +595,11 @@ local function collect_completions(prefix)
       and string.format('%03d', priority_config.base)
     or string.format('%03d', priority_config.base + 100)
 
-  local special_lists = { 'c', 'cpp' }
-
   return vim
     .iter(ipairs(results))
     :map(function(idx, node)
       return {
-        label = vim.list_contains(special_lists, vim.bo.filetype) and ' ' .. node.word or node.word,
+        label = node.word,
         filterText = node.word,
         kind = 1,
         sortText = string.format('%s%09d%s', sort_prefix, idx, node.word),
