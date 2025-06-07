@@ -595,15 +595,25 @@ local function collect_completions(prefix)
       and string.format('%03d', priority_config.base)
     or string.format('%03d', priority_config.base + 100)
 
+  local special = { 'c', 'cpp' }
+
   return vim
     .iter(ipairs(results))
     :map(function(idx, node)
-      return {
+      local t = {
         label = node.word,
         filterText = node.word,
         kind = 1,
         sortText = string.format('%s%09d%s', sort_prefix, idx, node.word),
       }
+
+      if vim.list_contains(special, vim.bo[0].filetype) then
+        t.label = ' ' .. node.word
+        t.insertText = node.word
+        t.insertTextFormat = vim.lsp.protocol.InsertTextFormat.PlainText
+      end
+
+      return t
     end)
     :totable()
 end
