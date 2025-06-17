@@ -55,10 +55,7 @@ vim.g.phoenix = {
       recency = 0.3, -- 30% weight to recent usage
       frequency = 0.7, -- 70% weight to frequency
     },
-    priority = {
-      base = 100, -- Base priority score (0-999)
-      position = 'after', -- Position relative to other LSP results: 'before' or 'after'
-    },
+    priority = 500,
   },
 
   -- Cleanup settings control dictionary maintenance
@@ -79,7 +76,10 @@ vim.g.phoenix = {
     throttle_delay_ms = 200, -- Wait 200ms between updates
     ignore_patterns = {}, -- Dictionary or file ignored when path completion
   },
-  snippet = '' -- path of snippet json file like c.json/zig.json/go.json
+  snippet = {
+    path = ''  -- path of snippet json file like c.json/zig.json/go.json
+    prioritiy = 200,
+  }
 }
 ```
 

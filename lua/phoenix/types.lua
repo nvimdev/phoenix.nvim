@@ -3,11 +3,6 @@
 ---@field recency number Weight for recency in scoring (0-1). Higher values favor recently used words more strongly
 ---@field frequency number Weight for frequency in scoring (0-1). Higher values favor frequently used words more strongly
 
----Configuration for completion item position
----@class PriorityConfig
----@field base integer Base priority score (0-999)
----@field position string Position relative to other LSP results: 'before' or 'after'
-
 ---Core dictionary configuration
 ---@class DictionaryConfig
 ---@field capacity number Maximum number of words to store in the dictionary. Higher values provide better completions but use more memory
@@ -19,7 +14,7 @@
 ---@field max_items integer Max result items
 ---@field decay_minutes integer Time period for decay calculation
 ---@field weights WeightConfig Scoring weights configuration for ranking completion candidates
----@field priority PriorityConfig
+---@field priority number
 
 ---Configuration for dictionary cleanup process
 ---@class CleanupConfig
@@ -38,6 +33,10 @@
 ---@field throttle_delay_ms number Delay between processing updates (milliseconds). Prevents excessive CPU usage during rapid changes
 ---@field ignore_patterns string[] Patterns for files/directories to ignore during scanning. Improves performance by skipping irrelevant items
 
+---@class SnippetConfig
+---@field path string
+---@field priority number
+
 ---Main configuration for Phoenix
 ---@class PhoenixConfig
 ---@field filetypes string[] List of filetypes to enable Phoenix for. Use {'*'} for all filetypes
@@ -45,4 +44,4 @@
 ---@field completion CompletionConfig Settings controlling the core dictionary behavior
 ---@field cleanup CleanupConfig Settings controlling how and when dictionary cleanup occurs
 ---@field scanner ScannerConfig Settings controlling file system scanning behavior
----@field snippet string Snippet path
+---@field snippet SnippetConfig

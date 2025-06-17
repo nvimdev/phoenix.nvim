@@ -22,10 +22,7 @@ local default = {
       recency = 0.3, -- 30% weight to recent usage
       frequency = 0.7, -- 70% weight to frequency
     },
-    priority = {
-      base = 100, -- Base priority score (0-999)
-      position = 'after', -- Position relative to other LSP results: 'before' or 'after'
-    },
+    priority = 500,
   },
 
   -- Cleanup settings control dictionary maintenance
@@ -46,7 +43,10 @@ local default = {
     throttle_delay_ms = 300, -- Wait 300ms between updates
     ignore_patterns = {}, -- No ignore patterns by default
   },
-  snippet = '',
+  snippet = {
+    path = '',
+    priority = 200,
+  },
 }
 
 --@type PhoenixConfig
@@ -498,7 +498,7 @@ function Snippet:preload()
   if self.cache[ft] or self.loading[ft] then
     return
   end
-  local path = vim.fs.joinpath(Config.snippet, ('%s.json'):format(ft))
+  local path = vim.fs.joinpath(Config.snippet.path, ('%s.json'):format(ft))
   if vim.fn.filereadable(path) == 1 then
     self.loading[ft] = true
     async.read_file(path, function(data)
@@ -525,6 +525,8 @@ local function parse_snippet(input)
   return ok and tostring(parsed) or input
 end
 
+local special = { 'c', 'cpp' }
+
 function Snippet:get_completions(prefix)
   local ft = vim.bo.filetype
   local results = {}
@@ -544,7 +546,7 @@ function Snippet:get_completions(prefix)
       end
 
       table.insert(results, {
-        label = trigger,
+        label = vim.list_contains(special, vim.bo[0].filetype) and '•' .. trigger or trigger,
         kind = 15,
         insertText = insert_text,
         documentation = {
@@ -557,7 +559,7 @@ function Snippet:get_completions(prefix)
             .. '\n```',
         },
         detail = 'Snippet: ' .. (snippet_data.description or ''),
-        sortText = string.format('001%s', trigger),
+        sortText = string.format('%03d%s', Config.snippet.priority or 200, trigger),
         insertTextFormat = 2,
       })
     end
@@ -574,7 +576,7 @@ local function collect_completions(prefix)
   local results = Trie.search_prefix(dict.trie, prefix)
   local now = vim.uv.now()
   local decay_time = Config.completion.decay_minutes * 60 * 1000
-  local priority_config = Config.completion.priority
+  local word_priority = Config.completion.priority or 500
 
   local max_freq = 0
   for _, result in ipairs(results) do
@@ -590,13 +592,6 @@ local function collect_completions(prefix)
     return score_a > score_b
   end)
 
-  -- Calculate sort prefix based on priority configuration
-  local sort_prefix = priority_config.position == 'before'
-      and string.format('%03d', priority_config.base)
-    or string.format('%03d', priority_config.base + 100)
-
-  local special = { 'c', 'cpp' }
-
   return vim
     .iter(ipairs(results))
     :map(function(idx, node)
@@ -604,7 +599,7 @@ local function collect_completions(prefix)
         label = node.word,
         filterText = node.word,
         kind = 1,
-        sortText = string.format('%s%09d%s', sort_prefix, idx, node.word),
+        sortText = string.format('%03d%09d%s', word_priority, idx, node.word),
       }
 
       if vim.list_contains(special, vim.bo[0].filetype) then
@@ -843,7 +838,7 @@ return {
           end,
         })
 
-        if #Config.snippet > 0 then
+        if #Config.snippet.path > 0 then
           Snippet:preload()
         end
       end,
