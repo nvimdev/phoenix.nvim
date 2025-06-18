@@ -33,10 +33,6 @@
 ---@field throttle_delay_ms number Delay between processing updates (milliseconds). Prevents excessive CPU usage during rapid changes
 ---@field ignore_patterns string[] Patterns for files/directories to ignore during scanning. Improves performance by skipping irrelevant items
 
----@class SnippetConfig
----@field path string
----@field priority number
-
 ---Main configuration for Phoenix
 ---@class PhoenixConfig
 ---@field filetypes string[] List of filetypes to enable Phoenix for. Use {'*'} for all filetypes
@@ -44,4 +40,4 @@
 ---@field completion CompletionConfig Settings controlling the core dictionary behavior
 ---@field cleanup CleanupConfig Settings controlling how and when dictionary cleanup occurs
 ---@field scanner ScannerConfig Settings controlling file system scanning behavior
----@field snippet SnippetConfig
+---@field snippet string

@@ -43,10 +43,7 @@ local default = {
     throttle_delay_ms = 300, -- Wait 300ms between updates
     ignore_patterns = {}, -- No ignore patterns by default
   },
-  snippet = {
-    path = '',
-    priority = 200,
-  },
+  snippet = '',
 }
 
 --@type PhoenixConfig
@@ -546,7 +543,7 @@ function Snippet:get_completions(prefix)
       end
 
       table.insert(results, {
-        label = vim.list_contains(special, vim.bo[0].filetype) and '•' .. trigger or trigger,
+        label = trigger,
         kind = 15,
         insertText = insert_text,
         documentation = {
@@ -559,7 +556,7 @@ function Snippet:get_completions(prefix)
             .. '\n```',
         },
         detail = 'Snippet: ' .. (snippet_data.description or ''),
-        sortText = string.format('%03d%s', Config.snippet.priority or 200, trigger),
+        sortText = string.format('000%s', trigger),
         insertTextFormat = 2,
       })
     end
