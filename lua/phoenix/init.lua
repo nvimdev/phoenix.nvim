@@ -495,7 +495,7 @@ function Snippet:preload()
   if self.cache[ft] or self.loading[ft] then
     return
   end
-  local path = vim.fs.joinpath(Config.snippet.path, ('%s.json'):format(ft))
+  local path = vim.fs.joinpath(Config.snippet, ('%s.json'):format(ft))
   if vim.fn.filereadable(path) == 1 then
     self.loading[ft] = true
     async.read_file(path, function(data)
@@ -835,7 +835,7 @@ return {
           end,
         })
 
-        if #Config.snippet.path > 0 then
+        if #Config.snippet > 0 then
           Snippet:preload()
         end
       end,
