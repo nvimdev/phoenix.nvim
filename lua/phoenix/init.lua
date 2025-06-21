@@ -534,7 +534,14 @@ function Snippet:get_completions(prefix)
 
   local snippets = self.cache[ft]
   for trigger, snippet_data in pairs(snippets) do
-    if vim.startswith(trigger:lower(), prefix:lower()) then
+    local snippet_prefix = snippet_data.prefix
+    if
+      vim.startswith(snippet_prefix:lower(), prefix:lower())
+      or (
+        vim.o.completeopt:find('fuzzy')
+        and next(vim.fn.matchfuzzy({ snippet_prefix }, prefix:lower())) ~= nil
+      )
+    then
       local body = snippet_data.body
       local insert_text = body
 
@@ -543,8 +550,9 @@ function Snippet:get_completions(prefix)
       end
 
       table.insert(results, {
-        label = trigger,
+        label = snippet_prefix,
         kind = 15,
+        filterText = snippet_prefix,
         insertText = insert_text,
         documentation = {
           kind = 'markdown',
