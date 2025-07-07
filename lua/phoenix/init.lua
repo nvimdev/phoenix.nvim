@@ -532,11 +532,21 @@ function Snippet:get_completions(prefix)
     return results
   end
 
+  local snippet_prefix_match = function(p)
+    for _, item in ipairs(p) do
+      if vim.startswith(item:lower(), prefix:lower()) then
+        return true
+      end
+    end
+    return false
+  end
+
   local snippets = self.cache[ft]
   for trigger, snippet_data in pairs(snippets) do
-    local snippet_prefix = snippet_data.prefix
+    local snippet_prefix = type(snippet_data.prefix) == 'string' and { snippet_data.prefix }
+      or snippet_data.prefix
     if
-      vim.startswith(snippet_prefix:lower(), prefix:lower())
+      snippet_prefix_match(snippet_data.prefix)
       or (
         vim.o.completeopt:find('fuzzy')
         and next(vim.fn.matchfuzzy({ snippet_prefix }, prefix:lower())) ~= nil
