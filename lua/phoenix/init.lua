@@ -546,7 +546,7 @@ function Snippet:get_completions(prefix)
     local snippet_prefix = type(snippet_data.prefix) == 'string' and { snippet_data.prefix }
       or snippet_data.prefix
     if
-      snippet_prefix_match(snippet_data.prefix)
+      snippet_prefix_match(snippet_prefix)
       or (
         vim.o.completeopt:find('fuzzy')
         and next(vim.fn.matchfuzzy({ snippet_prefix }, prefix:lower())) ~= nil
