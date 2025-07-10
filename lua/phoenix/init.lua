@@ -531,10 +531,14 @@ function Snippet:get_completions(prefix)
   if not self.cache[ft] then
     return results
   end
+  prefix = prefix:lower()
 
   local snippet_prefix_match = function(p)
     for _, item in ipairs(p) do
-      if vim.startswith(item:lower(), prefix:lower()) then
+      if
+        vim.startswith(item:lower(), prefix:lower())
+        or (vim.o.completeopt:find('fuzzy') and next(vim.fn.matchfuzzy({ item }, prefix)) ~= nil)
+      then
         return item
       end
     end
@@ -542,18 +546,12 @@ function Snippet:get_completions(prefix)
   end
 
   local snippets = self.cache[ft]
-  for trigger, snippet_data in pairs(snippets) do
+  for _, snippet_data in pairs(snippets) do
     local snippet_prefix = type(snippet_data.prefix) == 'string' and { snippet_data.prefix }
       or snippet_data.prefix
     local matched_label = snippet_prefix_match(snippet_prefix)
 
-    if
-      matched_label
-      or (
-        vim.o.completeopt:find('fuzzy')
-        and next(vim.fn.matchfuzzy({ snippet_prefix }, prefix:lower())) ~= nil
-      )
-    then
+    if matched_label then
       local body = snippet_data.body
       local insert_text = body
 
@@ -562,9 +560,9 @@ function Snippet:get_completions(prefix)
       end
 
       table.insert(results, {
-        label = matched_label or snippet_prefix,
+        label = matched_label,
         kind = 15,
-        filterText = snippet_prefix,
+        filterText = matched_label,
         insertText = insert_text,
         documentation = {
           kind = 'markdown',
@@ -576,8 +574,8 @@ function Snippet:get_completions(prefix)
             .. '\n```',
         },
         detail = 'Snippet: ' .. (snippet_data.description or ''),
-        sortText = string.format('000%s', trigger),
-        insertTextFormat = 2,
+        sortText = string.format('000%s', matched_label),
+        insertTextFormat = vim.lsp.protocol.InsertTextFormat.Snippet,
       })
     end
   end
