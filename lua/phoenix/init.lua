@@ -839,7 +839,7 @@ return {
         local buf = args.buf
         if
           not vim.bo[buf].modifiable
-          or vim.list_contains({ 'terminal', 'nofile' }, vim.bo[buf].buftype)
+          or vim.list_contains({ 'terminal', 'nofile', 'quickfix' }, vim.bo[buf].buftype)
         then
           return
         end
