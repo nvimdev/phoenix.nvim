@@ -40,7 +40,7 @@ local default = {
   scanner = {
     scan_batch_size = 1000, -- Scan 1000 items per batch
     cache_duration_ms = 5000, -- Cache results for 5s
-    throttle_delay_ms = 5000, -- Wait 5000ms between updates..otherwise we store lots of part of words..
+    throttle_delay_ms = 5000, -- Wait 5000ms between updates
     ignore_patterns = {}, -- No ignore patterns by default
   },
   snippet = '',
@@ -82,6 +82,44 @@ function Trie.insert(root, word, timestamp)
   node.frequency = node.frequency + 1
   node.last_used = timestamp
   return was_new
+end
+
+--- Remove a word from the trie, pruning empty branches
+---@return boolean true if the word existed and was removed
+function Trie.remove(root, word)
+  local nodes = { root }
+  local chars = {}
+  local node = root
+
+  for i = 1, #word do
+    local char = word:sub(i, i)
+    if not node.children[char] then
+      return false
+    end
+    node = node.children[char]
+    table.insert(nodes, node)
+    table.insert(chars, char)
+  end
+
+  if not node.is_end then
+    return false
+  end
+
+  node.is_end = false
+  node.frequency = 0
+  node.last_used = 0
+
+  -- Prune empty branches bottom-up
+  for i = #nodes, 2, -1 do
+    local child = nodes[i]
+    if not child.is_end and not next(child.children) then
+      nodes[i - 1].children[chars[i - 1]] = nil
+    else
+      break
+    end
+  end
+
+  return true
 end
 
 function Trie.search_prefix(root, prefix)
@@ -426,12 +464,6 @@ local function cleanup_dict()
   end)
 end
 
-local function visible_range(content)
-  local top = vim.fn.line('w0')
-  local bot = vim.fn.line('w$')
-  return vim.iter(vim.split(content, '\n')):slice(top, bot):join('\n')
-end
-
 -- Core word processing function
 local function process_words(line, seen, dict_config)
   local new_words = 0
@@ -639,12 +671,81 @@ local function find_last_occurrence(str, patterns)
   return nil
 end
 
+-- Track words from previous didChange snapshot so we can diff
+local prev_word_set = {}
+
+-- Debounced dictionary update for didChange
+-- Only fires after user stops typing for throttle_delay_ms
+local change_timer = vim.uv.new_timer()
+
+local function debounced_update_dict(text)
+  if not change_timer or change_timer:is_closing() then
+    return
+  end
+  change_timer:stop()
+  change_timer:start(Config.scanner.throttle_delay_ms, 0, function()
+    change_timer:stop()
+    vim.schedule(function()
+      local dict_config = Config.dict
+      local cursor_lnum = vim.api.nvim_win_get_cursor(0)[1]
+      local lines = vim.split(text, '\n')
+
+      -- Build current word set, skipping cursor line
+      local current_words = {}
+      for i, line in ipairs(lines) do
+        if i ~= cursor_lnum then
+          for word in line:gmatch(dict_config.word_pattern) do
+            if #word >= dict_config.min_word_length then
+              current_words[word] = true
+            end
+          end
+        end
+      end
+
+      -- Remove words that existed in prev snapshot but not in current
+      -- These are partial words or deleted words
+      for word in pairs(prev_word_set) do
+        if not current_words[word] then
+          if Trie.remove(dict.trie, word) then
+            dict.word_count = dict.word_count - 1
+          end
+        end
+      end
+
+      -- Insert new words that appear in current but not prev
+      local now = vim.uv.now()
+      for word in pairs(current_words) do
+        if not prev_word_set[word] then
+          if Trie.insert(dict.trie, word, now) then
+            dict.word_count = dict.word_count + 1
+          end
+        end
+      end
+
+      prev_word_set = current_words
+
+      if dict.word_count > dict.max_words then
+        cleanup_dict()
+      end
+    end)
+  end)
+end
+
 -- LSP handler functions
 local function handle_document_open(params)
   local text = params.textDocument.text
   if #text == 0 then
     return
   end
+
+  -- Build initial prev_word_set from opened document
+  local dict_config = Config.dict
+  for word in text:gmatch(dict_config.word_pattern) do
+    if #word >= dict_config.min_word_length then
+      prev_word_set[word] = true
+    end
+  end
+
   local content = vim.split(text, '%s', { trimempty = true })
   if #content == 0 then
     return
@@ -658,32 +759,12 @@ local function handle_document_change(params)
     return
   end
 
-  -- Process only the changed text
   local change = params.contentChanges[1]
   if not change or not change.text then
     return
   end
 
-  -- Process just the changed text
-  local lines = vim.split(change.text, '\n')
-  if #lines == 0 then
-    return
-  end
-
-  -- Process the new text directly without comparing to old version
-  local seen = {}
-  local dict_config = Config.dict
-  local new_words = 0
-
-  for _, line in ipairs(lines) do
-    new_words = new_words + process_words(line, seen, dict_config)
-  end
-
-  dict.word_count = dict.word_count + new_words
-
-  if dict.word_count > dict.max_words then
-    cleanup_dict()
-  end
+  debounced_update_dict(change.text)
 end
 
 function server.create()
